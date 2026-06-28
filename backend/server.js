@@ -29,7 +29,7 @@ app.use(
   })
 );
 app.use(express.json());
-app.use("/files", express.static(path.join(__dirname, "uploads")));
+
 
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,

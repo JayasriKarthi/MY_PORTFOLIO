@@ -7,40 +7,38 @@
 // When you're ready to deploy with real S3, swap this file's contents back to
 // the AWS SDK version - nothing else in the codebase needs to change.
 
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const UPLOADS_DIR = path.join(__dirname, "..", "uploads");
+export const s3 = new S3Client({
+  region: process.env.AWS_REGION,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  },
+});
 
-if (!fs.existsSync(UPLOADS_DIR)) {
-  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-}
-
-const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || "http://localhost:5000";
+const BUCKET = process.env.AWS_S3_BUCKET;
 
 export async function uploadToS3(buffer, key, contentType) {
-  const filePath = path.join(UPLOADS_DIR, key);
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, buffer);
-  return `${PUBLIC_BASE_URL}/files/${key}`;
+  await s3.send(
+    new PutObjectCommand({
+      Bucket: BUCKET,
+      Key: key,
+      Body: buffer,
+      ContentType: contentType,
+    })
+  );
+  return `https://${BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
 }
 
 export async function deleteFromS3(key) {
-  const filePath = path.join(UPLOADS_DIR, key);
-  if (fs.existsSync(filePath)) {
-    fs.unlinkSync(filePath);
-  }
+  await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
 }
 
 export function s3KeyFromUrl(url) {
   try {
     const u = new URL(url);
-    const marker = "/files/";
-    const idx = u.pathname.indexOf(marker);
-    if (idx === -1) return null;
-    return u.pathname.slice(idx + marker.length);
+    return u.pathname.slice(1);
   } catch {
     return null;
   }
